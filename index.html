@@ -762,10 +762,17 @@
   </div>
 
   <script>
-    // Подключение к вашей Supabase базе данных
     const SUPABASE_URL = "https://jmrlcyecjkdlwafepucg.supabase.co";
     const SUPABASE_KEY = "sb_publishable_roTtqktna2SZIH68BIQUBA_P3bk8GsB";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    let supabase = null;
+    try {
+      if (window.supabase) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+    } catch (e) {
+      console.log("Supabase init fallback");
+    }
 
     let currentUser = null;
     let activeChatTag = null;
@@ -883,7 +890,7 @@
       return 'ID: ' + Math.abs(hash % 900000 + 100000);
     }
 
-    // Регистрация аккаунта в Supabase
+    // Регистрация аккаунта с резервным локальным сохранением
     async function handleRegister() {
       const username = document.getElementById('regUser').value.trim();
       let userTag = document.getElementById('regUsername').value.trim().toLowerCase();
@@ -896,33 +903,55 @@
       }
       if (!userTag.startsWith('@')) userTag = '@' + userTag;
 
-      // Проверка на уникальность юзернейма в Supabase
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username_tag', userTag)
-        .single();
+      let users = JSON.parse(localStorage.getItem('aura_messenger_users') || '{}');
 
-      if (existingUser) {
-        errorDiv.textContent = 'Такой ЮЗ уже есть!';
+      // Проверка локально
+      if (users[username]) {
+        errorDiv.textContent = 'Имя уже занято!';
         return;
+      }
+      for (let acc in users) {
+        if (users[acc].usernameTag === userTag) {
+          errorDiv.textContent = 'Такой ЮЗ уже есть!';
+          return;
+        }
+      }
+
+      // Проверяем через Supabase (если доступен)
+      if (supabase) {
+        try {
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username_tag', userTag)
+            .single();
+
+          if (existingUser) {
+            errorDiv.textContent = 'Такой ЮЗ уже есть!';
+            return;
+          }
+        } catch (e) {
+          console.log("Supabase check skipped, using local storage");
+        }
       }
 
       const userId = generateUserId(username);
       
-      // Создаем пользователя в облаке
-      const { error } = await supabase.from('users').insert([
-        { display_name: username, username_tag: userTag, password: password, user_id: userId, lang: 'ru' }
-      ]);
-
-      if (error) {
-        let users = JSON.parse(localStorage.getItem('aura_messenger_users') || '{}');
-        users[username] = { password, userId, usernameTag: userTag, lang: 'ru' };
-        localStorage.setItem('aura_messenger_users', JSON.stringify(users));
-      }
+      // Сохраняем локально
+      users[username] = { password, userId, usernameTag: userTag, lang: 'ru' };
+      localStorage.setItem('aura_messenger_users', JSON.stringify(users));
 
       currentUser = { username: username, userId: userId, usernameTag: userTag, lang: 'ru' };
       localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
+
+      // Пытаемся отправить в Supabase в фоне
+      if (supabase) {
+        supabase.from('users').insert([
+          { display_name: username, username_tag: userTag, password: password, user_id: userId, lang: 'ru' }
+        ]).then(() => {});
+      }
+
+      initBotMessage(username, userId);
 
       document.getElementById('regUser').value = '';
       document.getElementById('regUsername').value = '';
@@ -941,31 +970,38 @@
         return;
       }
 
-      // Запрос в Supabase
-      const { data: user } = await supabase
-        .from('users')
-        .select('*')
-        .eq('display_name', username)
-        .eq('password', password)
-        .single();
-
-      if (user) {
-        currentUser = { username: user.display_name, userId: user.user_id, usernameTag: user.username_tag, lang: user.lang || 'ru' };
+      let users = JSON.parse(localStorage.getItem('aura_messenger_users') || '{}');
+      if (users[username] && users[username].password === password) {
+        currentUser = { username, userId: users[username].userId, usernameTag: users[username].usernameTag, lang: users[username].lang || 'ru' };
         localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
         openApp();
-      } else {
-        let users = JSON.parse(localStorage.getItem('aura_messenger_users') || '{}');
-        if (users[username] && users[username].password === password) {
-          currentUser = { username, userId: users[username].userId, usernameTag: users[username].usernameTag, lang: users[username].lang || 'ru' };
-          localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
-          openApp();
-        } else {
-          errorDiv.textContent = 'Неверное имя или пароль!';
+        return;
+      }
+
+      if (supabase) {
+        try {
+          const { data: user } = await supabase
+            .from('users')
+            .select('*')
+            .eq('display_name', username)
+            .eq('password', password)
+            .single();
+
+          if (user) {
+            currentUser = { username: user.display_name, userId: user.user_id, usernameTag: user.username_tag, lang: user.lang || 'ru' };
+            localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
+            openApp();
+            return;
+          }
+        } catch (e) {
+          console.log("Supabase login fallback");
         }
       }
+
+      errorDiv.textContent = 'Неверное имя или пароль!';
     }
 
-    // Поиск пользователей по ЮЗ
+    // Поиск пользователей
     async function searchUserByTag() {
       let queryTag = document.getElementById('searchInput').value.trim().toLowerCase();
       if (!queryTag.startsWith('@')) queryTag = '@' + queryTag;
@@ -973,15 +1009,26 @@
       const resultsContainer = document.getElementById('searchResults');
       resultsContainer.innerHTML = '<div style="color:var(--text-muted); padding:10px;">Поиск...</div>';
 
-      const { data: users } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username_tag', queryTag);
+      let foundUsers = [];
+      if (supabase) {
+        try {
+          const { data } = await supabase.from('users').select('*').eq('username_tag', queryTag);
+          if (data) foundUsers = data;
+        } catch (e) {}
+      }
+
+      if (foundUsers.length === 0) {
+        let users = JSON.parse(localStorage.getItem('aura_messenger_users') || '{}');
+        for (let acc in users) {
+          if (users[acc].usernameTag === queryTag) {
+            foundUsers.push({ display_name: acc, username_tag: queryTag });
+          }
+        }
+      }
 
       resultsContainer.innerHTML = '';
-
-      if (users && users.length > 0) {
-        users.forEach(u => {
+      if (foundUsers.length > 0) {
+        foundUsers.forEach(u => {
           if (u.username_tag !== currentUser.usernameTag) {
             const item = document.createElement('div');
             item.className = 'chat-item';
@@ -1020,16 +1067,22 @@
 
       if (!newTag.startsWith('@')) newTag = '@' + newTag;
 
-      const { data: existing } = await supabase.from('users').select('*').eq('username_tag', newTag).single();
-      if (existing) {
-        errDiv.textContent = 'Такой ЮЗ уже есть!';
-        return;
+      let users = JSON.parse(localStorage.getItem('aura_messenger_users') || '{}');
+      for (let acc in users) {
+        if (users[acc].usernameTag === newTag && acc !== currentUser.username) {
+          errDiv.textContent = 'Такой ЮЗ уже есть!';
+          return;
+        }
       }
 
-      await supabase.from('users').update({ username_tag: newTag }).eq('display_name', currentUser.username);
-
       currentUser.usernameTag = newTag;
+      users[currentUser.username].usernameTag = newTag;
+      localStorage.setItem('aura_messenger_users', JSON.stringify(users));
       localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
+
+      if (supabase) {
+        supabase.from('users').update({ username_tag: newTag }).eq('display_name', currentUser.username).then(() => {});
+      }
 
       document.getElementById('settingsUserTag').textContent = newTag;
       document.getElementById('newUsernameInput').value = '';
@@ -1076,6 +1129,13 @@
       document.getElementById('navSettings').textContent = t.navSett;
 
       document.getElementById('langSelect').value = lang;
+    }
+
+    function initBotMessage(username, userId) {
+      const chatKey = `chat_messages_${username}_Системный Бот`;
+      const welcomeText = `Привет, ${username}! Твой аккаунт успешно создан. Твой уникальный ID: ${userId}`;
+      const messages = [{ sender: 'bot', text: welcomeText }];
+      localStorage.setItem(chatKey, JSON.stringify(messages));
     }
 
     function openApp() {

@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Messenger</title>
+  <!-- Подключение Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --border-color: #334155;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      height: 100vh;
+      max-height: 750px;
+      background: var(--card-bg);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      position: relative;
+      overflow: hidden;
+    }
+
+    @media (min-width: 480px) {
+      .container {
+        border-radius: 20px;
+        height: 90vh;
+        border: 1px solid var(--border-color);
+      }
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      padding: 24px;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .screen.active {
+      display: flex !important;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Стартовый экран */
+    #welcomeScreen {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      gap: 20px;
+    }
+
+    .logo-icon {
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, #38bdf8, #0369a1);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: white;
+      box-shadow: 0 10px 20px rgba(56, 189, 248, 0.3);
+      margin-bottom: 8px;
+    }
+
+    #welcomeScreen h1 {
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    #welcomeScreen p {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 20px;
+      max-width: 280px;
+      line-height: 1.5;
+    }
+
+    .welcome-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    /* Формы */
+    .form-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .back-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .form-title-block h2 {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    .form-title-block p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      background: #0f172a;
+      color: white;
+      font-size: 15px;
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: var(--primary);
+    }
+
+    .error-msg {
+      color: var(--danger);
+      font-size: 13px;
+      margin-top: 8px;
+      text-align: center;
+      min-height: 20px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: var(--primary);
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid var(--border-color);
+    }
+
+    /* Главный интерфейс */
+    #appScreen {
+      padding: 0;
+    }
+
+    .messenger-body {
+      flex: 1;
+      overflow-y: auto;
+      background: #111827;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Шапка чатов */
+    .chats-header {
+      background: #0f172a;
+      padding: 16px 20px 10px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .chats-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .chats-title {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .chats-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .icon-btn {
+      background: #273548;
+      border: none;
+      color: white;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    /* Вкладки сверху */
+    .tabs-row {
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 4px;
+    }
+
+    .tabs-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab-item {
+      font-size: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      padding-bottom: 6px;
+      position: relative;
+      font-weight: 600;
+    }
+
+    .tab-item.active {
+      color: var(--primary);
+    }
+
+    .tab-item.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--primary);
+      border-radius: 2px;
+    }
+
+    /* Список чатов */
+    .chat-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-item {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px;
+      gap: 14px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+      transition: background 0.15s;
+    }
+
+    .chat-item:active {
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .chat-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #0f172a;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .chat-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .chat-name-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .chat-name {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text-main);
+    }
+
+    .chat-time {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .chat-last-msg {
+      font-size: 13px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Модальное окно поиска */
+    #searchModal {
+      display: none;
+      flex-direction: column;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #111827;
+      z-index: 20;
+      padding: 16px;
+    }
+
+    .search-input-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .search-input-box input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      background: var(--card-bg);
+      color: white;
+      outline: none;
+    }
+
+    /* Окно активного диалога */
+    #chatRoom {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      background: #111827;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 10;
+    }
+
+    .room-header {
+      background: #0f172a;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .room-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .message.sent {
+      align-self: flex-end;
+      background: var(--primary);
+      color: #0f172a;
+      border-bottom-right-radius: 2px;
+      font-weight: 500;
+    }
+
+    .message.received {
+      align-self: flex-start;
+      background: var(--card-bg);
+      color: var(--text-main);
+      border-bottom-left-radius: 2px;
+      border: 1px solid var(--border-color);
+    }
+
+    .room-input-area {
+      padding: 12px;
+      background: #0f172a;
+      display: flex;
+      gap: 8px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .room-input-area input {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--border-color);
+      background: var(--card-bg);
+      color: white;
+      outline: none;
+    }
+
+    .send-btn {
+      background: var(--primary);
+      border: none;
+      color: #0f172a;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    /* Настройки */
+    .settings-content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .settings-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .settings-card select, .settings-card input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: #0f172a;
+      color: white;
+      font-size: 14px;
+      outline: none;
+    }
+
+    /* Нижнее навигационное меню */
+    .bottom-nav {
+      background: #0f172a;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+    }
+
+    .nav-item {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      flex: 1;
+      transition: color 0.2s;
+    }
+
+    .nav-item.active {
+      color: var(--primary);
+    }
+
+    .nav-icon {
+      font-size: 20px;
+    }
+
+    .placeholder-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: var(--text-muted);
+      gap: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- 1. СТАРТОВЫЙ ЭКРАН -->
+    <div id="welcomeScreen" class="screen active">
+      <div class="logo-icon">💬</div>
+      <h1 id="wTitle">Aura Messenger</h1>
+      <p id="wDesc">Общайся, делись идеями и создавай своё комьюнити в один клик.</p>
+      
+      <div class="welcome-buttons">
+        <button class="btn" onclick="showScreen('loginScreen')" id="btnLoginText">Войти</button>
+        <button class="btn btn-secondary" onclick="showScreen('registerScreen')" id="btnRegText">Зарегистрироваться</button>
+      </div>
+    </div>
+
+    <!-- 2. ЭКРАН ВХОДА -->
+    <div id="loginScreen" class="screen">
+      <div class="form-header">
+        <button class="back-btn" onclick="showScreen('welcomeScreen')"><span id="backLoginText">← Назад</span></button>
+      </div>
+      
+      <div class="form-title-block">
+        <h2 id="lTitle">С возвращением!</h2>
+        <p id="lDesc">Введите данные вашего аккаунта для входа</p>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+        <div class="form-group">
+          <label id="lUserLabel">Имя пользователя</label>
+          <input type="text" id="loginUser" placeholder="Ваше имя..." autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label id="lPassLabel">Пароль</label>
+          <input type="password" id="loginPass" placeholder="••••••••">
+        </div>
+
+        <div class="error-msg" id="loginError"></div>
+        <button class="btn" onclick="handleLogin()" id="lBtnAction">Войти в аккаунт</button>
+      </div>
+    </div>
+
+    <!-- 3. ЭКРАН РЕГИСТРАЦИИ -->
+    <div id="registerScreen" class="screen">
+      <div class="form-header">
+        <button class="back-btn" onclick="showScreen('welcomeScreen')"><span id="backRegText">← Назад</span></button>
+      </div>
+      
+      <div class="form-title-block">
+        <h2>Создать аккаунт</h2>
+        <p>Придумайте уникальное имя, Юзернейм и пароль</p>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+        <div class="form-group">
+          <label>Имя пользователя</label>
+          <input type="text" id="regUser" placeholder="Имя..." autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label>Юзернейм (@username)</label>
+          <input type="text" id="regUsername" placeholder="например: alex_99" autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label>Пароль</label>
+          <input type="password" id="regPass" placeholder="••••••••">
+        </div>
+
+        <div class="error-msg" id="regError"></div>
+        <button class="btn" onclick="handleRegister()">Зарегистрироваться</button>
+      </div>
+    </div>
+
+    <!-- 4. ГЛАВНЫЙ ИНТЕРФЕЙС МЕССЕНДЖЕРА -->
+    <div id="appScreen" class="screen">
+      
+      <div class="messenger-body">
+        
+        <!-- Вкладка: ЧАТЫ -->
+        <div id="tabChats" style="display: flex; flex-direction: column; height: 100%;">
+          <div class="chats-header">
+            <div class="chats-top-row">
+              <div class="chats-title" id="navChatsTitle">Чаты</div>
+              <div class="chats-actions">
+                <button class="icon-btn" onclick="openSearchModal()">🔍</button>
+                <button class="icon-btn" style="background: var(--primary); color: #0f172a; font-weight: bold;" onclick="openSearchModal()">+</button>
+              </div>
+            </div>
+            
+            <div class="tabs-row">
+              <div class="tab-item active" id="tabAll">Все</div>
+              <div class="tab-item" id="tabPersonal">Личное</div>
+              <div class="tab-item" id="tabNew">Новые</div>
+            </div>
+          </div>
+
+          <div class="chat-list" id="chatListContainer">
+            <div class="chat-item" onclick="openChat('Системный Бот', '@bot')">
+              <div class="chat-avatar" style="background: linear-gradient(135deg, #38bdf8, #0284c7);">🤖</div>
+              <div class="chat-info">
+                <div class="chat-name-row">
+                  <span class="chat-name">Системный Бот</span>
+                  <span class="chat-time">только что</span>
+                </div>
+                <div class="chat-last-msg">Аккаунт успешно создан! ID выдан.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- МОДАЛЬНОЕ ОКНО ПОИСКА ПО ЮЗ -->
+        <div id="searchModal">
+          <div class="search-input-box">
+            <button class="back-btn" onclick="closeSearchModal()">←</button>
+            <input type="text" id="searchInput" placeholder="Введите ЮЗ (например: @alex_99)...">
+            <button class="btn" style="margin: 0; width: 80px;" onclick="searchUserByTag()">Искать</button>
+          </div>
+          <div id="searchResults" class="chat-list"></div>
+        </div>
+
+        <!-- Вкладка: КОНТАКТЫ -->
+        <div id="tabContacts" class="placeholder-screen" style="display: none;">
+          <div style="font-size: 40px;">👥</div>
+          <h3 id="contactsTitle">Контакты</h3>
+          <p id="contactsDesc">Здесь будет список твоих друзей и пользователей мессенджера.</p>
+        </div>
+
+        <!-- Вкладка: ЗВОНКИ -->
+        <div id="tabCalls" class="placeholder-screen" style="display: none;">
+          <div style="font-size: 40px;">📞</div>
+          <h3 id="callsTitle">Звонки</h3>
+          <p id="callsDesc">История аудио и видеовызовов.</p>
+        </div>
+
+        <!-- Вкладка: НАСТРОЙКИ -->
+        <div id="tabSettings" style="display: none; flex-direction: column; height: 100%; overflow-y: auto;">
+          <div class="chats-header">
+            <div class="chats-title" id="settingsHeaderTitle">Настройки</div>
+          </div>
+          
+          <div class="settings-content">
+            <div class="settings-card" style="align-items: center; text-align: center;">
+              <div class="chat-avatar" style="width: 64px; height: 64px; font-size: 24px;" id="settingsAvatar">👤</div>
+              <h3 id="settingsUserName">Имя</h3>
+              <p id="settingsUserTag" style="color: var(--primary); font-size: 14px; font-weight: 600;">@username</p>
+              <p id="settingsUserId" style="color: var(--text-muted); font-size: 12px;">ID: 000000</p>
+            </div>
+
+            <!-- Настройка Юзернейма -->
+            <div class="settings-card">
+              <label style="font-size: 13px; font-weight: 600; color: var(--text-muted);" id="lblChangeUsername">Изменить Юзернейм (ЮЗ)</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="newUsernameInput" placeholder="@new_username">
+                <button class="btn" style="margin-top:0; width: 100px;" onclick="changeUsername()" id="btnSaveUsername">Сохранить</button>
+              </div>
+              <div class="error-msg" id="settingsError" style="margin-top: 4px;"></div>
+            </div>
+
+            <!-- Выбор языка -->
+            <div class="settings-card">
+              <label style="font-size: 13px; font-weight: 600; color: var(--text-muted);" id="lblLangSelect">Язык интерфейса / Language</label>
+              <select id="langSelect" onchange="changeLanguage(this.value)">
+                <option value="ru">Русский</option>
+                <option value="en">English</option>
+                <option value="uk">Українська</option>
+              </select>
+            </div>
+
+            <button class="btn" style="background: var(--danger); color: white;" onclick="logout()" id="btnLogout">Выйти из аккаунта</button>
+          </div>
+        </div>
+
+        <!-- Окно отдельного чата -->
+        <div id="chatRoom">
+          <div class="room-header">
+            <button class="back-btn" onclick="closeChat()">← <span id="backChatText">Назад</span></button>
+            <div id="roomChatName" style="font-weight: bold; font-size: 16px;">Имя чата</div>
+          </div>
+          <div class="room-messages" id="roomMessages"></div>
+          <div class="room-input-area">
+            <input type="text" id="roomInput" placeholder="Сообщение..." onkeypress="handleRoomKey(event)">
+            <button class="send-btn" onclick="sendRoomMessage()">➤</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Нижнее меню навигации -->
+      <div class="bottom-nav" id="bottomNav">
+        <button class="nav-item" onclick="switchTab('tabContacts', this)">
+          <span class="nav-icon">👥</span>
+          <span id="navContacts">Контакты</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('tabCalls', this)">
+          <span class="nav-icon">📞</span>
+          <span id="navCalls">Звонки</span>
+        </button>
+        <button class="nav-item active" onclick="switchTab('tabChats', this)">
+          <span class="nav-icon">💬</span>
+          <span id="navChatsTab">Чаты</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('tabSettings', this)">
+          <span class="nav-icon">⚙️</span>
+          <span id="navSettings">Настройки</span>
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Подключение к вашей Supabase базе данных
+    const SUPABASE_URL = "https://jmrlcyecjkdlwafepucg.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_roTtqktna2SZIH68BIQUBA_P3bk8GsB";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let currentUser = null;
+    let activeChatTag = null;
+
+    const translations = {
+      ru: {
+        wTitle: "Aura Messenger",
+        wDesc: "Общайся, делись идеями и создавай своё комьюнити в один клик.",
+        btnLogin: "Войти",
+        btnReg: "Зарегистрироваться",
+        back: "← Назад",
+        lTitle: "С возвращением!",
+        lDesc: "Введите данные вашего аккаунта для входа",
+        userLabel: "Имя пользователя",
+        passLabel: "Пароль",
+        lBtn: "Войти в аккаунт",
+        navChats: "Чаты",
+        tabAll: "Все",
+        tabPersonal: "Личное",
+        tabNew: "Новые",
+        contacts: "Контакты",
+        contactsDesc: "Здесь будет список твоих друзей и пользователей мессенджера.",
+        calls: "Звонки",
+        callsDesc: "История аудио и видеовызовов.",
+        settings: "Настройки",
+        changeUsr: "Изменить Юзернейм (ЮЗ)",
+        save: "Сохранить",
+        langLbl: "Язык интерфейса / Language",
+        logout: "Выйти из аккаунта",
+        navCont: "Контакты",
+        navCall: "Звонки",
+        navChat: "Чаты",
+        navSett: "Настройки"
+      },
+      en: {
+        wTitle: "Aura Messenger",
+        wDesc: "Chat, share ideas and build your community in one click.",
+        btnLogin: "Sign In",
+        btnReg: "Sign Up",
+        back: "← Back",
+        lTitle: "Welcome Back!",
+        lDesc: "Enter your account credentials to log in",
+        userLabel: "Username",
+        passLabel: "Password",
+        lBtn: "Log In",
+        navChats: "Chats",
+        tabAll: "All",
+        tabPersonal: "Personal",
+        tabNew: "New",
+        contacts: "Contacts",
+        contactsDesc: "Here will be your friends and messenger users list.",
+        calls: "Calls",
+        callsDesc: "Audio and video calls history.",
+        settings: "Settings",
+        changeUsr: "Change Username",
+        save: "Save",
+        langLbl: "Interface Language",
+        logout: "Log Out",
+        navCont: "Contacts",
+        navCall: "Calls",
+        navChat: "Chats",
+        navSett: "Settings"
+      },
+      uk: {
+        wTitle: "Aura Messenger",
+        wDesc: "Спілкуйся, ділися ідеями та створюй своє ком'юніті в один клік.",
+        btnLogin: "Увійти",
+        btnReg: "Зареєструватися",
+        back: "← Назад",
+        lTitle: "З поверненням!",
+        lDesc: "Введіть дані вашого облікового запису для входу",
+        userLabel: "Ім'я користувача",
+        passLabel: "Пароль",
+        lBtn: "Увійти в акаунт",
+        navChats: "Чати",
+        tabAll: "Усі",
+        tabPersonal: "Особисті",
+        tabNew: "Нові",
+        contacts: "Контакти",
+        contactsDesc: "Тут буде список твоїх друзів та користувачів месенджера.",
+        calls: "Дзвінки",
+        callsDesc: "Історія аудіо та відеодзвінків.",
+        settings: "Налаштування",
+        changeUsr: "Змінити Юзернейм (ЮЗ)",
+        save: "Зберегти",
+        langLbl: "Мова інтерфейсу",
+        logout: "Вийти з акаунта",
+        navCont: "Контакти",
+        navCall: "Дзвінки",
+        navChat: "Чати",
+        navSett: "Налаштування"
+      }
+    };
+
+    window.onload = function() {
+      const savedSession = localStorage.getItem('aura_messenger_session');
+      if (savedSession) {
+        currentUser = JSON.parse(savedSession);
+        openApp();
+      }
+    };
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(screenId).classList.add('active');
+      document.getElementById('loginError').textContent = '';
+      document.getElementById('regError').textContent = '';
+    }
+
+    function generateUserId(username) {
+      let hash = 0;
+      for (let i = 0; i < username.length; i++) {
+        hash = username.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return 'ID: ' + Math.abs(hash % 900000 + 100000);
+    }
+
+    // Регистрация аккаунта в Supabase
+    async function handleRegister() {
+      const username = document.getElementById('regUser').value.trim();
+      let userTag = document.getElementById('regUsername').value.trim().toLowerCase();
+      const password = document.getElementById('regPass').value.trim();
+      const errorDiv = document.getElementById('regError');
+
+      if (!username || !userTag || !password) {
+        errorDiv.textContent = 'Заполните все поля!';
+        return;
+      }
+      if (!userTag.startsWith('@')) userTag = '@' + userTag;
+
+      // Проверка на уникальность юзернейма в Supabase
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username_tag', userTag)
+        .single();
+
+      if (existingUser) {
+        errorDiv.textContent = 'Такой ЮЗ уже есть!';
+        return;
+      }
+
+      const userId = generateUserId(username);
+      
+      // Создаем пользователя в облаке
+      const { error } = await supabase.from('users').insert([
+        { display_name: username, username_tag: userTag, password: password, user_id: userId, lang: 'ru' }
+      ]);
+
+      if (error) {
+        let users = JSON.parse(localStorage.getItem('aura_messenger_users') || '{}');
+        users[username] = { password, userId, usernameTag: userTag, lang: 'ru' };
+        localStorage.setItem('aura_messenger_users', JSON.stringify(users));
+      }
+
+      currentUser = { username: username, userId: userId, usernameTag: userTag, lang: 'ru' };
+      localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
+
+      document.getElementById('regUser').value = '';
+      document.getElementById('regUsername').value = '';
+      document.getElementById('regPass').value = '';
+      openApp();
+    }
+
+    // Вход в аккаунт
+    async function handleLogin() {
+      const username = document.getElementById('loginUser').value.trim();
+      const password = document.getElementById('loginPass').value.trim();
+      const errorDiv = document.getElementById('loginError');
+
+      if (!username || !password) {
+        errorDiv.textContent = 'Заполните все поля!';
+        return;
+      }
+
+      // Запрос в Supabase
+      const { data: user } = await supabase
+        .from('users')
+        .select('*')
+        .eq('display_name', username)
+        .eq('password', password)
+        .single();
+
+      if (user) {
+        currentUser = { username: user.display_name, userId: user.user_id, usernameTag: user.username_tag, lang: user.lang || 'ru' };
+        localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
+        openApp();
+      } else {
+        let users = JSON.parse(localStorage.getItem('aura_messenger_users') || '{}');
+        if (users[username] && users[username].password === password) {
+          currentUser = { username, userId: users[username].userId, usernameTag: users[username].usernameTag, lang: users[username].lang || 'ru' };
+          localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
+          openApp();
+        } else {
+          errorDiv.textContent = 'Неверное имя или пароль!';
+        }
+      }
+    }
+
+    // Поиск пользователей по ЮЗ
+    async function searchUserByTag() {
+      let queryTag = document.getElementById('searchInput').value.trim().toLowerCase();
+      if (!queryTag.startsWith('@')) queryTag = '@' + queryTag;
+
+      const resultsContainer = document.getElementById('searchResults');
+      resultsContainer.innerHTML = '<div style="color:var(--text-muted); padding:10px;">Поиск...</div>';
+
+      const { data: users } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username_tag', queryTag);
+
+      resultsContainer.innerHTML = '';
+
+      if (users && users.length > 0) {
+        users.forEach(u => {
+          if (u.username_tag !== currentUser.usernameTag) {
+            const item = document.createElement('div');
+            item.className = 'chat-item';
+            item.onclick = () => {
+              closeSearchModal();
+              openChat(u.display_name, u.username_tag);
+            };
+            item.innerHTML = `
+              <div class="chat-avatar">${u.display_name[0].toUpperCase()}</div>
+              <div class="chat-info">
+                <div class="chat-name">${u.display_name}</div>
+                <div class="chat-last-msg">${u.username_tag}</div>
+              </div>
+            `;
+            resultsContainer.appendChild(item);
+          }
+        });
+      } else {
+        resultsContainer.innerHTML = '<div style="color:var(--text-muted); padding:10px;">Пользователь не найден</div>';
+      }
+    }
+
+    function openSearchModal() {
+      document.getElementById('searchModal').style.display = 'flex';
+      document.getElementById('searchInput').value = '';
+      document.getElementById('searchResults').innerHTML = '';
+    }
+
+    function closeSearchModal() {
+      document.getElementById('searchModal').style.display = 'none';
+    }
+
+    async function changeUsername() {
+      let newTag = document.getElementById('newUsernameInput').value.trim().toLowerCase();
+      const errDiv = document.getElementById('settingsError');
+
+      if (!newTag.startsWith('@')) newTag = '@' + newTag;
+
+      const { data: existing } = await supabase.from('users').select('*').eq('username_tag', newTag).single();
+      if (existing) {
+        errDiv.textContent = 'Такой ЮЗ уже есть!';
+        return;
+      }
+
+      await supabase.from('users').update({ username_tag: newTag }).eq('display_name', currentUser.username);
+
+      currentUser.usernameTag = newTag;
+      localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
+
+      document.getElementById('settingsUserTag').textContent = newTag;
+      document.getElementById('newUsernameInput').value = '';
+      errDiv.style.color = '#4ade80';
+      errDiv.textContent = 'Юзернейм успешно изменён!';
+      setTimeout(() => { errDiv.textContent = ''; errDiv.style.color = 'var(--danger)'; }, 3000);
+    }
+
+    function changeLanguage(langCode) {
+      currentUser.lang = langCode;
+      localStorage.setItem('aura_messenger_session', JSON.stringify(currentUser));
+      applyLanguage(langCode);
+    }
+
+    function applyLanguage(lang) {
+      const t = translations[lang] || translations['ru'];
+      document.getElementById('wTitle').textContent = t.wTitle;
+      document.getElementById('wDesc').textContent = t.wDesc;
+      document.getElementById('btnLoginText').textContent = t.btnLogin;
+      document.getElementById('btnRegText').textContent = t.btnReg;
+      document.getElementById('backLoginText').textContent = t.back;
+      document.getElementById('backRegText').textContent = t.back;
+      document.getElementById('lTitle').textContent = t.lTitle;
+      document.getElementById('lDesc').textContent = t.lDesc;
+      document.getElementById('lUserLabel').textContent = t.userLabel;
+      document.getElementById('lPassLabel').textContent = t.passLabel;
+      document.getElementById('lBtnAction').textContent = t.lBtn;
+      document.getElementById('navChatsTitle').textContent = t.navChats;
+      document.getElementById('tabAll').textContent = t.tabAll;
+      document.getElementById('tabPersonal').textContent = t.tabPersonal;
+      document.getElementById('tabNew').textContent = t.tabNew;
+      document.getElementById('contactsTitle').textContent = t.contacts;
+      document.getElementById('contactsDesc').textContent = t.contactsDesc;
+      document.getElementById('callsTitle').textContent = t.calls;
+      document.getElementById('callsDesc').textContent = t.callsDesc;
+      document.getElementById('settingsHeaderTitle').textContent = t.settings;
+      document.getElementById('lblChangeUsername').textContent = t.changeUsr;
+      document.getElementById('btnSaveUsername').textContent = t.save;
+      document.getElementById('lblLangSelect').textContent = t.langLbl;
+      document.getElementById('btnLogout').textContent = t.logout;
+      document.getElementById('navContacts').textContent = t.navCont;
+      document.getElementById('navCalls').textContent = t.navCall;
+      document.getElementById('navChatsTab').textContent = t.navChat;
+      document.getElementById('navSettings').textContent = t.navSett;
+
+      document.getElementById('langSelect').value = lang;
+    }
+
+    function openApp() {
+      showScreen('appScreen');
+      document.getElementById('settingsUserName').textContent = currentUser.username;
+      document.getElementById('settingsUserTag').textContent = currentUser.usernameTag || ('@' + currentUser.username.toLowerCase());
+      document.getElementById('settingsUserId').textContent = currentUser.userId;
+      document.getElementById('settingsAvatar').textContent = currentUser.username[0].toUpperCase();
+      
+      applyLanguage(currentUser.lang || 'ru');
+      switchTab('tabChats', document.querySelectorAll('.nav-item')[2]);
+    }
+
+    function logout() {
+      localStorage.removeItem('aura_messenger_session');
+      currentUser = null;
+      closeChat();
+      showScreen('welcomeScreen');
+    }
+
+    function switchTab(tabId, btnElement) {
+      closeChat();
+      document.getElementById('tabChats').style.display = 'none';
+      document.getElementById('tabContacts').style.display = 'none';
+      document.getElementById('tabCalls').style.display = 'none';
+      document.getElementById('tabSettings').style.display = 'none';
+
+      document.getElementById(tabId).style.display = 'flex';
+
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      if (btnElement) btnElement.classList.add('active');
+    }
+
+    function openChat(chatName, chatTag) {
+      activeChatTag = chatTag;
+      document.getElementById('roomChatName').textContent = chatName;
+      document.getElementById('chatRoom').style.display = 'flex';
+      loadMessages(chatName);
+    }
+
+    function closeChat() {
+      document.getElementById('chatRoom').style.display = 'none';
+      activeChatTag = null;
+    }
+
+    function loadMessages(chatName) {
+      const roomMsgs = document.getElementById('roomMessages');
+      roomMsgs.innerHTML = '';
+
+      const chatKey = `chat_messages_${currentUser.username}_${chatName}`;
+      let messages = JSON.parse(localStorage.getItem(chatKey) || '[]');
+
+      if (messages.length === 0 && chatName === 'Системный Бот') {
+        messages = [{ sender: 'bot', text: `Привет, ${currentUser.username}! Твой аккаунт успешно создан. Твой уникальный ID: ${currentUser.userId}` }];
+        localStorage.setItem(chatKey, JSON.stringify(messages));
+      }
+
+      messages.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = msg.sender === 'sent' ? 'message sent' : 'message received';
+        div.textContent = msg.text;
+        roomMsgs.appendChild(div);
+      });
+
+      roomMsgs.scrollTop = roomMsgs.scrollHeight;
+    }
+
+    function sendRoomMessage() {
+      const input = document.getElementById('roomInput');
+      const text = input.value.trim();
+      const chatName = document.getElementById('roomChatName').textContent;
+      if (!text) return;
+
+      const chatKey = `chat_messages_${currentUser.username}_${chatName}`;
+      let messages = JSON.parse(localStorage.getItem(chatKey) || '[]');
+
+      messages.push({ sender: 'sent', text: text });
+      
+      if (chatName === 'Системный Бот') {
+        setTimeout(() => {
+          let botReply = "Я системный бот Aura. Твой ID: " + currentUser.userId;
+          if (text.toLowerCase().includes('ид') || text.toLowerCase().includes('id')) {
+            botReply = "Твой персональный ID в системе: " + currentUser.userId;
+          }
+          messages.push({ sender: 'bot', text: botReply });
+          localStorage.setItem(chatKey, JSON.stringify(messages));
+          if (document.getElementById('chatRoom').style.display === 'flex') {
+            loadMessages(chatName);
+          }
+        }, 600);
+      }
+
+      localStorage.setItem(chatKey, JSON.stringify(messages));
+      input.value = '';
+      loadMessages(chatName);
+    }
+
+    function handleRoomKey(e) {
+      if (e.key === 'Enter') {
+        sendRoomMessage();
+      }
+    }
+  </script>
+</body>
+</html>
